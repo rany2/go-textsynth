@@ -59,7 +59,7 @@ func main() {
 	} else if *promptfile != "" {
 		f, err := os.Open(*promptfile)
 		if err != nil {
-			log.Fatal(nil)
+			log.Fatal(err)
 		}
 		defer f.Close()
 		reader := bufio.NewReader(f)
