@@ -108,9 +108,9 @@ func main() {
 			var newPrompt = *prompt
 
 			finished := make(chan bool, 1)
+			sigchan := make (chan os.Signal, 1)
+			signal.Notify(sigchan, os.Interrupt)
 			go func(){
-				sigchan := make (chan os.Signal, 1)
-				signal.Notify(sigchan, os.Interrupt)
 				for s.Scan() {
 					select {
 					case <-sigchan:
@@ -133,6 +133,8 @@ func main() {
 			if err := s.Err(); err != nil {
 				log.Fatal(err)
 			}
+			close(finished)
+			close(sigchan)
 
 			fmt.Println()
 			switch whatNow() {
