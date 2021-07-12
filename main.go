@@ -133,8 +133,6 @@ func main() {
 			if err := s.Err(); err != nil {
 				log.Fatal(err)
 			}
-			close(finished)
-			close(sigchan)
 
 			fmt.Println()
 			switch whatNow() {
