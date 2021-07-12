@@ -98,6 +98,9 @@ func main() {
 
 			client := &http.Client{}
 			resp, err := client.Do(req)
+			if err != nil {
+				log.Fatal(err)
+			}
 			defer resp.Body.Close()
 			if resp.StatusCode != 200 {
 				log.Fatalf("Service returned %d status code. Expected 200.", resp.StatusCode)
