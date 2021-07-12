@@ -80,7 +80,7 @@ func main() {
 			}
 		}
 	} else if *prompt == "" {
-		log.Fatal("prompt must be set.")
+		log.Fatal("prompt must be set via -prompt or -promptfile.")
 	}
 
 	if *temperature < 0.1 || *temperature > 10.0 {
