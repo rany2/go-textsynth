@@ -62,7 +62,7 @@ func main() {
 		}
 		defer f.Close()
 		reader := bufio.NewReader(f)
-		buf := make([]byte, 2^16)
+		buf := make([]byte, 65536)
 		for {
 			if len(*prompt) > PROMPT_MAX_SIZE {
 				log.Fatalf ("While reading file exceeded limit %d, before aborting it was %d.", PROMPT_MAX_SIZE, len(*prompt))
