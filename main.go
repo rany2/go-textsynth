@@ -10,9 +10,12 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"io"
 	promptui "github.com/manifoldco/promptui"
 	tm "github.com/buger/goterm"
 )
+
+const PROMPT_MAX_SIZE = 4095;
 
 func keyExists(decoded map[string]interface{}, key string) bool {
 	val, ok := decoded[key]
@@ -34,6 +37,7 @@ func whatNow() string {
 func main() {
 	model := flag.String("model", "gptj_6B", "Select a model (gpt2_345M, gpt2_1558M, or gptj_6B)")
 	prompt := flag.String("prompt", "", "Prompt to send to Text Synth")
+	promptfile := flag.String("promptfile", "", "Like prompt but read from file")
 	temperature := flag.Float64("temperature", 1.0, "Divide the logits (=log(probability) of the tokens) by the temperature value (0.1 <= temperature <= 10)")
 	top_k := flag.Float64("top_k", 40, "Keep only the top-k tokens with the highest probability (1 <= top-k <= 1000)")
 	top_p := flag.Float64("top_p", 0.9, "Keep the top tokens having cumulative probability >= top-p (0 < top-p <= 1)")
@@ -49,7 +53,32 @@ func main() {
 		log.Fatal("model must be either gpt2_345M, gpt2_1558M, or gptj_6B.")
 	}
 
-	if *prompt == "" {
+	if *promptfile != "" && *prompt != "" {
+		log.Fatal("prompt and promptfile are mutually exclusive.")
+	} else if *promptfile != "" {
+		f, err := os.Open(*promptfile)
+		if err != nil {
+			log.Fatal(nil)
+		}
+		defer f.Close()
+		reader := bufio.NewReader(f)
+		buf := make([]byte, 2^16)
+		for {
+			if len(*prompt) > PROMPT_MAX_SIZE {
+				log.Fatalf ("While reading file exceeded limit %d, before aborting it was %d.", PROMPT_MAX_SIZE, len(*prompt))
+			} else {
+				_, err := reader.Read(buf)
+				if err != nil {
+					if err == io.EOF {
+						break
+					} else {
+						log.Fatal(err)
+					}
+				}
+				*prompt += string(buf)
+			}
+		}
+	} else if *prompt == "" {
 		log.Fatal("prompt must be set.")
 	}
 
@@ -75,8 +104,8 @@ func main() {
 
 	outer:
 		for {
-			if len(*prompt) >= 4096 {
-				log.Fatalf("The service doesn't accept prompt sizes greater than 4095 bytes. Current prompt size is %d bytes.", len(*prompt))
+			if len(*prompt) > PROMPT_MAX_SIZE {
+				log.Fatalf("The service doesn't accept prompt sizes greater than %d bytes. Current prompt size is %d bytes.", PROMPT_MAX_SIZE, len(*prompt))
 			}
 			//fmt.Print ("\x1b[0;0H") // move cursor to top
 			//fmt.Print ("\x1b[0J") // clear screen down
