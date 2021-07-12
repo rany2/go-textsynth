@@ -89,12 +89,15 @@ func main() {
 				log.Fatal(err)
 			}
 
-			resp, err := http.Post("https://bellard.org/textsynth/api/v1/engines/"+ *model +"/completions",
-				"application/json",
-				bytes.NewBuffer(request))
+			req, err := http.NewRequest("POST", "https://bellard.org/textsynth/api/v1/engines/"+ *model +"/completions", bytes.NewBuffer(request))
 			if err != nil {
 				log.Fatal(err)
 			}
+			req.Header.Set("User-Agent", "https://github.com/rany2/go-textsynth")
+			req.Header.Set("Content-Type", "application/json")
+
+			client := &http.Client{}
+			resp, err := client.Do(req)
 			defer resp.Body.Close()
 			if resp.StatusCode != 200 {
 				log.Fatalf("Service returned %d status code. Expected 200.", resp.StatusCode)
