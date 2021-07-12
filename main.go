@@ -46,23 +46,23 @@ func main() {
 		"gptj_6B": true,
 	}
 	if !allowedModels[*model] {
-		log.Fatal("Model must be either gpt2_345M, gpt2_1558M, or gptj_6B.")
+		log.Fatal("model must be either gpt2_345M, gpt2_1558M, or gptj_6B.")
 	}
 
 	if *prompt == "" {
-		log.Fatal("A prompt must be set.")
+		log.Fatal("prompt must be set.")
 	}
 
 	if *temperature < 0.1 || *temperature > 10.0 {
-		log.Fatal("Temperature must be between 0.1 and 10.")
+		log.Fatal("temperature must be between 0.1 and 10.")
 	}
 
 	if *top_k < 1 || *top_k > 1000 {
-		log.Fatal("Top-k must be between 1 and 1000.")
+		log.Fatal("top_k must be between 1 and 1000.")
 	}
 
-	if *top_p < 0 || *top_p > 1 {
-		log.Fatal("Top-p must be between 0 and 1.")
+	if *top_p <= 0 || *top_p > 1 {
+		log.Fatal("invalid top_p value (0 < top-p <= 1).")
 	}
 
 	var j map[string]interface{}
