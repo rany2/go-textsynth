@@ -95,6 +95,10 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
+			defer resp.Body.Close()
+			if resp.StatusCode != 200 {
+				log.Fatalf("Service returned %d status code. Expected 200.", resp.StatusCode)
+			}
 
 			fmt.Printf ("%s", *prompt)
 			s := bufio.NewScanner(resp.Body)
