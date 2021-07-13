@@ -8,7 +8,7 @@ import (
 	"fmt"
 	tm "github.com/buger/goterm"
 	promptui "github.com/manifoldco/promptui"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 	"io"
 	"log"
 	"net/http"
@@ -172,7 +172,7 @@ outer:
 		signal.Stop(sigchan) // stop listening on ctrl-c
 
 		fmt.Println()
-		if terminal.IsTerminal(syscall.Stdin) && terminal.IsTerminal(syscall.Stdout) {
+		if term.IsTerminal(syscall.Stdin) && term.IsTerminal(syscall.Stdout) {
 			switch whatNow() {
 			case "Continue":
 				*prompt = newPrompt
