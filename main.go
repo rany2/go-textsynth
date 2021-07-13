@@ -15,6 +15,11 @@ import (
 	tm "github.com/buger/goterm"
 )
 
+// Create HTTP transports to share pool of connections while disabling compression
+var tr = &http.Transport{}
+var client = &http.Client{Transport: tr}
+
+// Set prompt size limit and file chunk size
 const PROMPT_MAX_SIZE = 4095;
 const CHUNK_SIZE = 65536;
 
@@ -126,7 +131,6 @@ func main() {
 			req.Header.Set("User-Agent", "https://github.com/rany2/go-textsynth")
 			req.Header.Set("Content-Type", "application/json")
 
-			client := &http.Client{}
 			resp, err := client.Do(req)
 			if err != nil {
 				log.Fatal(err)
