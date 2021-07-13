@@ -17,7 +17,7 @@ import (
 	"syscall"
 )
 
-// Create HTTP transports to share pool of connections while disabling compression
+// Create HTTP transports to share pool of connections
 var tr = &http.Transport{}
 var client = &http.Client{Transport: tr}
 
