@@ -21,9 +21,8 @@ import (
 var tr = &http.Transport{}
 var client = &http.Client{Transport: tr}
 
-// Set prompt size limit and file chunk size
+// Set prompt size limit
 const PROMPT_MAX_SIZE = 4095
-const CHUNK_SIZE = 65536
 
 func keyExists(decoded map[string]interface{}, key string) bool {
 	val, ok := decoded[key]
@@ -70,7 +69,7 @@ func main() {
 		}
 		defer f.Close()
 		reader := bufio.NewReader(f)
-		part := make([]byte, CHUNK_SIZE)
+		part := make([]byte, PROMPT_MAX_SIZE)
 		for {
 			if len(*prompt) > PROMPT_MAX_SIZE {
 				log.Fatalf("While reading file exceeded prompt limit of %d bytes, before aborting it was %d bytes.", PROMPT_MAX_SIZE, len(*prompt))
