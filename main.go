@@ -1,18 +1,20 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"net/http"
 	"bufio"
-	"log"
 	"bytes"
+	"encoding/json"
 	"flag"
+	"fmt"
+	tm "github.com/buger/goterm"
+	promptui "github.com/manifoldco/promptui"
+	"golang.org/x/crypto/ssh/terminal"
+	"io"
+	"log"
+	"net/http"
 	"os"
 	"os/signal"
-	"io"
-	promptui "github.com/manifoldco/promptui"
-	tm "github.com/buger/goterm"
+	"syscall"
 )
 
 // Create HTTP transports to share pool of connections while disabling compression
@@ -20,8 +22,8 @@ var tr = &http.Transport{}
 var client = &http.Client{Transport: tr}
 
 // Set prompt size limit and file chunk size
-const PROMPT_MAX_SIZE = 4095;
-const CHUNK_SIZE = 65536;
+const PROMPT_MAX_SIZE = 4095
+const CHUNK_SIZE = 65536
 
 func keyExists(decoded map[string]interface{}, key string) bool {
 	val, ok := decoded[key]
@@ -50,10 +52,10 @@ func main() {
 	seed := flag.Uint("seed", 0, "Seed of the random number generator. Use 0 for a random seed.")
 	flag.Parse()
 
-	allowedModels := map[string]bool {
-		"gpt2_345M": true,
+	allowedModels := map[string]bool{
+		"gpt2_345M":  true,
 		"gpt2_1558M": true,
-		"gptj_6B": true,
+		"gptj_6B":    true,
 	}
 	if !allowedModels[*model] {
 		log.Fatal("model must be either gpt2_345M, gpt2_1558M, or gptj_6B.")
@@ -71,13 +73,13 @@ func main() {
 		part := make([]byte, CHUNK_SIZE)
 		for {
 			if len(*prompt) > PROMPT_MAX_SIZE {
-				log.Fatalf ("While reading file exceeded prompt limit of %d bytes, before aborting it was %d bytes.", PROMPT_MAX_SIZE, len(*prompt))
+				log.Fatalf("While reading file exceeded prompt limit of %d bytes, before aborting it was %d bytes.", PROMPT_MAX_SIZE, len(*prompt))
 			} else {
 				if count, err := reader.Read(part); err != nil {
 					if err == io.EOF {
 						break
 					} else {
-						log.Fatal (err)
+						log.Fatal(err)
 					}
 				} else {
 					*prompt += string(part[:count])
@@ -108,77 +110,80 @@ func main() {
 	j["seed"] = *seed
 	j["stream"] = true
 
-	outer:
-		for {
-			if len(*prompt) > PROMPT_MAX_SIZE {
-				log.Fatalf("The service doesn't accept prompt sizes greater than %d bytes. Current prompt size is %d bytes.", PROMPT_MAX_SIZE, len(*prompt))
-			}
-			//fmt.Print ("\x1b[0;0H") // move cursor to top
-			//fmt.Print ("\x1b[0J") // clear screen down
-			tm.Clear() // clear screen using a library
-			tm.MoveCursor(1,1)  // move to top
-			tm.Flush() // send changes
-			j["prompt"] = *prompt
-			request, err := json.Marshal(&j)
-			if err != nil {
-				log.Fatal(err)
-			}
+outer:
+	for {
+		if len(*prompt) > PROMPT_MAX_SIZE {
+			log.Fatalf("The service doesn't accept prompt sizes greater than %d bytes. Current prompt size is %d bytes.", PROMPT_MAX_SIZE, len(*prompt))
+		}
+		tm.Clear()          // clear screen using a library
+		tm.MoveCursor(1, 1) // move to top
+		tm.Flush()          // send changes
+		j["prompt"] = *prompt
+		request, err := json.Marshal(&j)
+		if err != nil {
+			log.Fatal(err)
+		}
 
-			req, err := http.NewRequest("POST", "https://bellard.org/textsynth/api/v1/engines/"+ *model +"/completions", bytes.NewBuffer(request))
-			if err != nil {
-				log.Fatal(err)
-			}
-			req.Header.Set("User-Agent", "https://github.com/rany2/go-textsynth")
-			req.Header.Set("Content-Type", "application/json")
+		req, err := http.NewRequest("POST", "https://bellard.org/textsynth/api/v1/engines/"+*model+"/completions", bytes.NewBuffer(request))
+		if err != nil {
+			log.Fatal(err)
+		}
+		req.Header.Set("User-Agent", "https://github.com/rany2/go-textsynth")
+		req.Header.Set("Content-Type", "application/json")
 
-			resp, err := client.Do(req)
-			if err != nil {
-				log.Fatal(err)
-			}
-			defer resp.Body.Close()
-			if resp.StatusCode != 200 {
-				log.Fatalf("Service returned %d status code. Expected 200.", resp.StatusCode)
-			}
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			log.Fatalf("Service returned %d status code. Expected 200.", resp.StatusCode)
+		}
 
-			fmt.Printf ("%s", *prompt)
-			s := bufio.NewScanner(resp.Body)
-			var newPrompt = *prompt
+		fmt.Printf("%s", *prompt)
+		s := bufio.NewScanner(resp.Body)
+		var newPrompt = *prompt
 
-			finished := make(chan bool, 1)
-			sigchan := make (chan os.Signal, 1)
-			signal.Notify(sigchan, os.Interrupt)
-			go func(){
-				for s.Scan() {
-					select {
-					case <-sigchan:
-						finished <- true
-						return
-					default:
-						var m map[string]interface{}
-						err := json.Unmarshal(s.Bytes(), &m)
-						if err == nil {
-							if keyExists(m, "text") {
-								fmt.Printf ("%s", m["text"].(string))
-								newPrompt += m["text"].(string)
-							}
+		finished := make(chan bool, 1)
+		sigchan := make(chan os.Signal, 1)
+		signal.Notify(sigchan, os.Interrupt)
+		go func() {
+			for s.Scan() {
+				select {
+				case <-sigchan:
+					finished <- true
+					return
+				default:
+					var m map[string]interface{}
+					err := json.Unmarshal(s.Bytes(), &m)
+					if err == nil {
+						if keyExists(m, "text") {
+							fmt.Printf("%s", m["text"].(string))
+							newPrompt += m["text"].(string)
 						}
 					}
 				}
-				finished <- true
-			}()
-			<-finished
-			if err := s.Err(); err != nil {
-				log.Fatal(err)
 			}
-
-			fmt.Println()
-			switch whatNow() {
-				case "Continue":
-					*prompt = newPrompt
-				case "Retry":
-					break
-				default:
-					break outer
-			}
+			finished <- true
+		}()
+		<-finished
+		if err := s.Err(); err != nil {
+			log.Fatal(err)
 		}
+		signal.Stop(sigchan) // stop listening on ctrl-c
+
+		fmt.Println()
+		if terminal.IsTerminal(syscall.Stdin) && terminal.IsTerminal(syscall.Stdout) {
+			switch whatNow() {
+			case "Continue":
+				*prompt = newPrompt
+			case "Retry":
+				break
+			default:
+				break outer
+			}
+		} else {
+			break outer
+		}
+	}
 }
