@@ -72,7 +72,7 @@ func main() {
 		part := make([]byte, PROMPT_MAX_SIZE)
 		for {
 			if len(*prompt) > PROMPT_MAX_SIZE {
-				log.Fatalf("While reading file exceeded prompt limit of %d bytes, before aborting it was %d bytes.", PROMPT_MAX_SIZE, len(*prompt))
+				log.Fatalf("promptfile surpasses prompt limit of %d bytes.", PROMPT_MAX_SIZE)
 			} else {
 				if count, err := reader.Read(part); err != nil {
 					if err == io.EOF {
