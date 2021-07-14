@@ -18,7 +18,7 @@ import (
 )
 
 // Create HTTP transports to share pool of connections
-var tr = &http.Transport{}
+var tr = http.DefaultTransport.(*http.Transport).Clone()
 var client = &http.Client{Transport: tr}
 
 // Set prompt size limit
