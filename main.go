@@ -46,8 +46,8 @@ func main() {
 	prompt := flag.String("prompt", "", "Prompt to send to Text Synth")
 	promptfile := flag.String("promptfile", "", "Like prompt but read from file")
 	temperature := flag.Float64("temperature", 1.0, "Divide the logits (=log(probability) of the tokens) by the temperature value (0.1 <= temperature <= 10)")
-	top_k := flag.Float64("top_k", 40, "Keep only the top-k tokens with the highest probability (1 <= top-k <= 1000)")
-	top_p := flag.Float64("top_p", 0.9, "Keep the top tokens having cumulative probability >= top-p (0 < top-p <= 1)")
+	top_k := flag.Float64("top-k", 40, "Keep only the top-k tokens with the highest probability (1 <= top-k <= 1000)")
+	top_p := flag.Float64("top-p", 0.9, "Keep the top tokens having cumulative probability >= top-p (0 < top-p <= 1)")
 	seed := flag.Uint("seed", 0, "Seed of the random number generator. Use 0 for a random seed.")
 	flag.Parse()
 
