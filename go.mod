@@ -3,8 +3,8 @@ module github.com/rany2/go-textsynth
 go 1.16
 
 require (
-	github.com/buger/goterm v1.0.1
-	github.com/manifoldco/promptui v0.8.0
+	github.com/AlecAivazis/survey/v2 v2.2.14
+	github.com/inancgumus/screen v0.0.0-20190314163918-06e984b86ed3
 	golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1 // indirect
-	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
+	golang.org/x/term v0.0.0-20210503060354-a79de5458b56
 )

@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	tm "github.com/buger/goterm"
-	promptui "github.com/manifoldco/promptui"
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/inancgumus/screen"
+	. "github.com/rany2/go-textsynth/pkg/NormalizeNewlines"
+	. "github.com/rany2/go-textsynth/pkg/WindowsNewlines"
 	"golang.org/x/term"
 	"io"
 	"log"
@@ -30,15 +32,24 @@ func keyExists(decoded map[string]interface{}, key string) bool {
 }
 
 func whatNow() string {
-	prompt := promptui.Select{
-		Label: "What now?",
-		Items: []string{"Continue", "Retry", "Exit"},
+	response := struct {
+		WhatNow string
+	}{}
+	prompt := []*survey.Question{
+		{
+			Name: "WhatNow",
+			Prompt: &survey.Select{
+				Message: "What now?",
+				Options: []string{"Continue", "Retry", "Exit"},
+			},
+			Validate: survey.Required,
+		},
 	}
-	_, result, err := prompt.Run()
+	err := survey.Ask(prompt, &response)
 	if err != nil {
 		log.Fatal(err)
 	}
-	return result
+	return response.WhatNow
 }
 
 func main() {
@@ -49,6 +60,7 @@ func main() {
 	top_k := flag.Float64("top-k", 40, "Keep only the top-k tokens with the highest probability (1 <= top-k <= 1000)")
 	top_p := flag.Float64("top-p", 0.9, "Keep the top tokens having cumulative probability >= top-p (0 < top-p <= 1)")
 	seed := flag.Uint("seed", 0, "Seed of the random number generator. Use 0 for a random seed.")
+	dont_normalize_newline := flag.Bool("dont-normalize-newline", false, "Do not convert Windows and Mac OS line endings to Unix")
 	flag.Parse()
 
 	allowedModels := map[string]bool{
@@ -89,6 +101,10 @@ func main() {
 		log.Fatal("prompt must be set via -prompt or -promptfile.")
 	}
 
+	if !*dont_normalize_newline {
+		*prompt = string(NormalizeNewlines([]byte(*prompt)))
+	}
+
 	if *temperature < 0.1 || *temperature > 10.0 {
 		log.Fatal("temperature must be between 0.1 and 10.")
 	}
@@ -114,9 +130,12 @@ outer:
 		if len(*prompt) > PROMPT_MAX_SIZE {
 			log.Fatalf("The service doesn't accept prompt sizes greater than %d bytes. Current prompt size is %d bytes.", PROMPT_MAX_SIZE, len(*prompt))
 		}
-		tm.Clear()          // clear screen using a library
-		tm.MoveCursor(1, 1) // move to top
-		tm.Flush()          // send changes
+
+		if term.IsTerminal(syscall.Stdin) && term.IsTerminal(syscall.Stdout) {
+			screen.Clear()
+			screen.MoveTopLeft()
+		}
+
 		j["prompt"] = *prompt
 		request, err := json.Marshal(&j)
 		if err != nil {
@@ -157,7 +176,13 @@ outer:
 					err := json.Unmarshal(s.Bytes(), &m)
 					if err == nil {
 						if keyExists(m, "text") {
-							fmt.Printf("%s", m["text"].(string))
+							if !*dont_normalize_newline && LineBreak == "\n" {
+								fmt.Printf("%s", string(NormalizeNewlines([]byte(m["text"].(string)))))
+							} else if !*dont_normalize_newline && LineBreak == "\r\n" {
+								fmt.Printf("%s", string(WindowsNewlines([]byte(m["text"].(string)))))
+							} else {
+								fmt.Printf("%s", m["text"].(string))
+							}
 							newPrompt += m["text"].(string)
 						}
 					}
@@ -171,7 +196,7 @@ outer:
 		}
 		signal.Stop(sigchan) // stop listening on ctrl-c
 
-		fmt.Println()
+		fmt.Printf("%s", LineBreak)
 		if term.IsTerminal(syscall.Stdin) && term.IsTerminal(syscall.Stdout) {
 			switch whatNow() {
 			case "Continue":
