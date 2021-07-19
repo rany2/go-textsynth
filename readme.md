@@ -16,7 +16,9 @@ If the results aren't what you wanted, you might want to try to
 The results do seem better when using those settings but I'll keep
 using the Text Synth website's defaults for this program.
 
-Note that when using `-promptfile` you probably want a text editor
-that doesn't automatically add newlines to the end of the file.
-The data you send to `go-textsynth` is not modified in any way
-(no trimming, the entire prompt file is sent, etc).
+When using `-promptfile` you probably want a text editor that
+doesn't automatically add newlines to the end of the file.
+By default, CR or CRLF line endings are replaced with LF; you
+could use `-dont-normalize-newline` to disable this. However,
+`go-textsynth` doesn't do anything about trailing newlines,
+trailing spaces, repeating spaces, etc.
