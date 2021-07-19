@@ -1,10 +1,14 @@
+# go-textsynth
+
 Text Synth client in Go.
 
-To build:
+## To build
 
 * `git clone https://github.com/rany2/go-textsynth.git`
 * `go build ./cmd/go-textsynth`
 * (or you can use `go install ...`, whichever you prefer)
+
+## Notes
 
 If the results aren't what you wanted, you might want to try to
 [set `-top-p` to `1.0` and `-temperature` to something between
