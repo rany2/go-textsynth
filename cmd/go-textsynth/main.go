@@ -26,6 +26,9 @@ var client = &http.Client{Transport: tr}
 // Set prompt size limit
 const PROMPT_MAX_SIZE = 4095
 
+// Set seed limit
+const SEED_LIMIT = 2147483647
+
 func keyExists(decoded map[string]interface{}, key string) bool {
 	val, ok := decoded[key]
 	return ok && val != nil
@@ -115,6 +118,10 @@ func main() {
 
 	if *top_p <= 0 || *top_p > 1 {
 		log.Fatal("invalid top_p value (0 < top-p <= 1).")
+	}
+
+	if *seed > SEED_LIMIT {
+		log.Fatalf("seed cannot be greater than %d", SEED_LIMIT)
 	}
 
 	var j map[string]interface{}
