@@ -8,6 +8,29 @@ Text Synth client in Go.
 * `go build ./cmd/go-textsynth`
 * (or you can use `go install ...`, whichever you prefer)
 
+## Usage
+
+```
+$ go-textsynth -h 
+Usage of go-textsynth:
+  -dont-normalize-newline
+    	Do not convert Windows and Mac OS line endings to Unix
+  -model string
+    	Select a model (gpt2_345M, gpt2_1558M, or gptj_6B) (default "gptj_6B")
+  -prompt string
+    	Prompt to send to Text Synth
+  -promptfile string
+    	Like prompt but read from file
+  -seed uint
+    	Seed of the random number generator. Use 0 for a random seed.
+  -temperature float
+    	Divide the logits (=log(probability) of the tokens) by the temperature value (0.1 <= temperature <= 10) (default 1)
+  -top-k float
+    	Keep only the top-k tokens with the highest probability (1 <= top-k <= 1000) (default 40)
+  -top-p float
+    	Keep the top tokens having cumulative probability >= top-p (0 < top-p <= 1) (default 0.9)
+```
+
 ## Notes
 
 If the results aren't what you wanted, you might want to try to
@@ -15,6 +38,11 @@ If the results aren't what you wanted, you might want to try to
 `0.7` and `0.8`](https://news.ycombinator.com/item?id=27727257).
 The results do seem better when using those settings but I'll keep
 using the Text Synth website's defaults for this program.
+
+In order to use `go-textsynth`, you must provide a prompt via
+either `-prompt` or `-promptfile`. `-prompt` takes the argument
+after it as the prompt while `-promptfile` takes the argument
+after it as the file path to read the prompt from.
 
 When using `-promptfile` you probably want a text editor that
 doesn't automatically add newlines to the end of the file.
