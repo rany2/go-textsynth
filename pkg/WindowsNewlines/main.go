@@ -2,7 +2,8 @@ package WindowsNewlines
 
 import (
 	"bytes"
-	. "github.com/rany2/go-textsynth/pkg/NormalizeNewlines"
+
+	. "github.com/rany2/go-textsynth/pkg/NormalizeNewlines" //lint:ignore ST1001 //
 )
 
 // WindowsNewlines normalizes \r and \n into \r\n

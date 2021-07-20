@@ -6,17 +6,19 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/AlecAivazis/survey/v2"
-	"github.com/inancgumus/screen"
-	. "github.com/rany2/go-textsynth/pkg/NormalizeNewlines"
-	. "github.com/rany2/go-textsynth/pkg/WindowsNewlines"
-	"golang.org/x/term"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/inancgumus/screen"
+
+	. "github.com/rany2/go-textsynth/pkg/NormalizeNewlines" //lint:ignore ST1001 //
+	. "github.com/rany2/go-textsynth/pkg/WindowsNewlines"   //lint:ignore ST1001 //
+	"golang.org/x/term"
 )
 
 // Create HTTP transports to share pool of connections

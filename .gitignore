@@ -1,2 +1,4 @@
 go-textsynth
 !cmd/**
+!vendor/**
+!pkg/**
