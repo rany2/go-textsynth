@@ -126,8 +126,7 @@ func main() {
 		log.Fatalf("seed cannot be greater than %d", SEED_LIMIT)
 	}
 
-	var j map[string]interface{}
-	_ = json.Unmarshal([]byte("{}"), &j)
+	j := make(map[string]interface{})
 	j["temperature"] = *temperature
 	j["top_k"] = *top_k
 	j["top_p"] = *top_p
