@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -147,7 +148,9 @@ outer:
 			log.Fatal(err)
 		}
 
-		req, err := http.NewRequest("POST", "https://bellard.org/textsynth/api/v1/engines/"+*model+"/completions", bytes.NewBuffer(request))
+		ctx := context.Background()
+		ctx, cancel := context.WithCancel(ctx)
+		req, err := http.NewRequestWithContext(ctx, "POST", "https://bellard.org/textsynth/api/v1/engines/"+*model+"/completions", bytes.NewBuffer(request))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -172,34 +175,30 @@ outer:
 		signal.Notify(sigchan, os.Interrupt)
 		go func() {
 			for s.Scan() {
-				select {
-				case <-sigchan:
-					finished <- true
-					return
-				default:
-					var m map[string]interface{}
-					err := json.Unmarshal(s.Bytes(), &m)
-					if err == nil {
-						if keyExists(m, "text") {
-							if !*dontNormalizeNewline && lineBreak == "\n" {
-								fmt.Printf("%s", string(normalizenewlines.Run([]byte(m["text"].(string)))))
-							} else if !*dontNormalizeNewline && lineBreak == "\r\n" {
-								fmt.Printf("%s", string(windowsnewlines.Run([]byte(m["text"].(string)))))
-							} else {
-								fmt.Printf("%s", m["text"].(string))
-							}
-							newPrompt += m["text"].(string)
+				var m map[string]interface{}
+				err := json.Unmarshal(s.Bytes(), &m)
+				if err == nil {
+					if keyExists(m, "text") {
+						if !*dontNormalizeNewline && lineBreak == "\n" {
+							fmt.Printf("%s", string(normalizenewlines.Run([]byte(m["text"].(string)))))
+						} else if !*dontNormalizeNewline && lineBreak == "\r\n" {
+							fmt.Printf("%s", string(windowsnewlines.Run([]byte(m["text"].(string)))))
+						} else {
+							fmt.Printf("%s", m["text"].(string))
 						}
+						newPrompt += m["text"].(string)
 					}
 				}
 			}
 			finished <- true
 		}()
+		go func() {
+			<-sigchan
+			cancel()
+		}()
 		<-finished
-		if err := s.Err(); err != nil {
-			log.Fatal(err)
-		}
 		signal.Stop(sigchan) // stop listening on ctrl-c
+		close(sigchan)       // close channel to end goroutine
 
 		fmt.Printf("%s", lineBreak)
 		if term.IsTerminal(syscall.Stdin) && term.IsTerminal(syscall.Stdout) {
