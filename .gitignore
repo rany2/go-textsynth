@@ -1,4 +1,5 @@
 go-textsynth
+vendor/
+vendor/**
 !cmd/**
-!vendor/**
 !pkg/**

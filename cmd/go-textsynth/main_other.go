@@ -1,3 +1,3 @@
 package main
 
-const LineBreak = "\n"
+const lineBreak = "\n"

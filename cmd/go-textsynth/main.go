@@ -16,8 +16,9 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/inancgumus/screen"
 
-	. "github.com/rany2/go-textsynth/pkg/NormalizeNewlines" //lint:ignore ST1001 //
-	. "github.com/rany2/go-textsynth/pkg/WindowsNewlines"   //lint:ignore ST1001 //
+	"github.com/rany2/go-textsynth/pkg/normalizenewlines"
+	"github.com/rany2/go-textsynth/pkg/windowsnewlines"
+
 	"golang.org/x/term"
 )
 
@@ -25,11 +26,11 @@ import (
 var tr = http.DefaultTransport.(*http.Transport).Clone()
 var client = &http.Client{Transport: tr}
 
-// Set prompt size limit
-const PROMPT_MAX_SIZE = 4095
+// PromptMaxSize sets the max prompt size limit to send to the API
+const PromptMaxSize = 4095
 
-// Set seed limit
-const SEED_LIMIT = 2147483647
+// SeedLimit sets seed limit, anything over that limit causes the API to return an error
+const SeedLimit = 2147483647
 
 func keyExists(decoded map[string]interface{}, key string) bool {
 	val, ok := decoded[key]
@@ -62,10 +63,10 @@ func main() {
 	prompt := flag.String("prompt", "", "Prompt to send to Text Synth")
 	promptfile := flag.String("promptfile", "", "Like prompt but read from file")
 	temperature := flag.Float64("temperature", 1.0, "Divide the logits (=log(probability) of the tokens) by the temperature value (0.1 <= temperature <= 10)")
-	top_k := flag.Float64("top-k", 40, "Keep only the top-k tokens with the highest probability (1 <= top-k <= 1000)")
-	top_p := flag.Float64("top-p", 0.9, "Keep the top tokens having cumulative probability >= top-p (0 < top-p <= 1)")
+	topK := flag.Float64("top-k", 40, "Keep only the top-k tokens with the highest probability (1 <= top-k <= 1000)")
+	topP := flag.Float64("top-p", 0.9, "Keep the top tokens having cumulative probability >= top-p (0 < top-p <= 1)")
 	seed := flag.Uint("seed", 0, "Seed of the random number generator. Use 0 for a random seed.")
-	dont_normalize_newline := flag.Bool("dont-normalize-newline", false, "Do not convert Windows and Mac OS line endings to Unix")
+	dontNormalizeNewline := flag.Bool("dont-normalize-newline", false, "Do not convert Windows and Mac OS line endings to Unix")
 	flag.Parse()
 
 	allowedModels := map[string]bool{
@@ -86,57 +87,53 @@ func main() {
 		}
 		defer f.Close()
 		reader := bufio.NewReader(f)
-		part := make([]byte, PROMPT_MAX_SIZE)
+		part := make([]byte, PromptMaxSize)
 		for {
-			if len(*prompt) > PROMPT_MAX_SIZE {
-				log.Fatalf("promptfile surpasses prompt limit of %d bytes.", PROMPT_MAX_SIZE)
-			} else {
-				if count, err := reader.Read(part); err != nil {
-					if err == io.EOF {
-						break
-					} else {
-						log.Fatal(err)
-					}
+			if count, err := reader.Read(part); err != nil {
+				if err == io.EOF {
+					break
 				} else {
-					*prompt += string(part[:count])
+					log.Fatal(err)
 				}
+			} else {
+				*prompt += string(part[:count])
 			}
 		}
 	} else if *prompt == "" {
 		log.Fatal("prompt must be set via -prompt or -promptfile.")
 	}
 
-	if !*dont_normalize_newline {
-		*prompt = string(NormalizeNewlines([]byte(*prompt)))
+	if !*dontNormalizeNewline {
+		*prompt = string(normalizenewlines.Run([]byte(*prompt)))
 	}
 
 	if *temperature < 0.1 || *temperature > 10.0 {
 		log.Fatal("temperature must be between 0.1 and 10.")
 	}
 
-	if *top_k < 1 || *top_k > 1000 {
+	if *topK < 1 || *topK > 1000 {
 		log.Fatal("top_k must be between 1 and 1000.")
 	}
 
-	if *top_p <= 0 || *top_p > 1 {
+	if *topP <= 0 || *topP > 1 {
 		log.Fatal("invalid top_p value (0 < top-p <= 1).")
 	}
 
-	if *seed > SEED_LIMIT {
-		log.Fatalf("seed cannot be greater than %d", SEED_LIMIT)
+	if *seed > SeedLimit {
+		log.Fatalf("seed cannot be greater than %d", SeedLimit)
 	}
 
 	j := make(map[string]interface{})
 	j["temperature"] = *temperature
-	j["top_k"] = *top_k
-	j["top_p"] = *top_p
+	j["top_k"] = *topK
+	j["top_p"] = *topP
 	j["seed"] = *seed
 	j["stream"] = true
 
 outer:
 	for {
-		if len(*prompt) > PROMPT_MAX_SIZE {
-			log.Fatalf("The service doesn't accept prompt sizes greater than %d bytes. Current prompt size is %d bytes.", PROMPT_MAX_SIZE, len(*prompt))
+		if len(*prompt) > PromptMaxSize {
+			log.Fatalf("The service doesn't accept prompt sizes greater than %d bytes. Current prompt size is %d bytes.", PromptMaxSize, len(*prompt))
 		}
 
 		if term.IsTerminal(syscall.Stdin) && term.IsTerminal(syscall.Stdout) {
@@ -184,10 +181,10 @@ outer:
 					err := json.Unmarshal(s.Bytes(), &m)
 					if err == nil {
 						if keyExists(m, "text") {
-							if !*dont_normalize_newline && LineBreak == "\n" {
-								fmt.Printf("%s", string(NormalizeNewlines([]byte(m["text"].(string)))))
-							} else if !*dont_normalize_newline && LineBreak == "\r\n" {
-								fmt.Printf("%s", string(WindowsNewlines([]byte(m["text"].(string)))))
+							if !*dontNormalizeNewline && lineBreak == "\n" {
+								fmt.Printf("%s", string(normalizenewlines.Run([]byte(m["text"].(string)))))
+							} else if !*dontNormalizeNewline && lineBreak == "\r\n" {
+								fmt.Printf("%s", string(windowsnewlines.Run([]byte(m["text"].(string)))))
 							} else {
 								fmt.Printf("%s", m["text"].(string))
 							}
@@ -204,7 +201,7 @@ outer:
 		}
 		signal.Stop(sigchan) // stop listening on ctrl-c
 
-		fmt.Printf("%s", LineBreak)
+		fmt.Printf("%s", lineBreak)
 		if term.IsTerminal(syscall.Stdin) && term.IsTerminal(syscall.Stdout) {
 			switch whatNow() {
 			case "Continue":
