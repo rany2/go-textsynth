@@ -86,6 +86,8 @@ func communicate(model string, j map[string]interface{}, dontNormalizeNewline bo
 		screen.MoveTopLeft()
 	}
 
+	fmt.Printf("%s", j["prompt"].(string))
+
 	request, err := json.Marshal(&j)
 	if err != nil {
 		log.Fatal(err)
@@ -109,7 +111,6 @@ func communicate(model string, j map[string]interface{}, dontNormalizeNewline bo
 		log.Fatalf("Service returned %d status code. Expected 200.", resp.StatusCode)
 	}
 
-	fmt.Printf("%s", j["prompt"].(string))
 	s := bufio.NewScanner(resp.Body)
 	var newPrompt = j["prompt"].(string)
 
