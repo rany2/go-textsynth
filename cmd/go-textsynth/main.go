@@ -204,8 +204,8 @@ outer:
 		promptCheck(*prompt)
 		j["prompt"] = *prompt
 		var newPrompt = communicate(*model, j, *dontNormalizeNewline)
-		fmt.Printf("%s", lineBreak)
 		if term.IsTerminal(syscall.Stdin) && term.IsTerminal(syscall.Stdout) {
+			fmt.Printf("%s", lineBreak)
 			switch whatNow() {
 			case "Continue":
 				*prompt = newPrompt
