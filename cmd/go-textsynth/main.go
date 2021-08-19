@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -33,11 +32,25 @@ const PromptMaxSize = 4095
 // SeedLimit sets seed limit, anything over that limit causes the API to return an error
 const SeedLimit = 2147483647
 
+// keyExists is responsible for checking if server responded with json key
 func keyExists(decoded map[string]interface{}, key string) bool {
 	val, ok := decoded[key]
 	return ok && val != nil
 }
 
+// validateModel checks if the model requested is available on Text Synth
+func validateModel(model string) {
+	allowedModels := map[string]bool{
+		"gpt2_345M":  true,
+		"gpt2_1558M": true,
+		"gptj_6B":    true,
+	}
+	if !allowedModels[model] {
+		log.Fatal("model must be either gpt2_345M, gpt2_1558M, or gptj_6B.")
+	}
+}
+
+// Prompts the user after Text Synth was either interrupted or finished
 func whatNow() string {
 	response := struct {
 		WhatNow string
@@ -59,6 +72,79 @@ func whatNow() string {
 	return response.WhatNow
 }
 
+// promptCheck checks if the service would accept the prompt or not
+func promptCheck(prompt string) {
+	if len(prompt) > PromptMaxSize {
+		log.Fatalf("The service doesn't accept prompt sizes greater than %d bytes. Current prompt size is %d bytes.", PromptMaxSize, len(prompt))
+	}
+}
+
+// communicate connects to the Text Synth server to send the prompt and show it to the user
+func communicate(model string, j map[string]interface{}, dontNormalizeNewline bool) string {
+	if term.IsTerminal(syscall.Stdin) && term.IsTerminal(syscall.Stdout) {
+		screen.Clear()
+		screen.MoveTopLeft()
+	}
+
+	request, err := json.Marshal(&j)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://bellard.org/textsynth/api/v1/engines/"+model+"/completions", bytes.NewBuffer(request))
+	if err != nil {
+		log.Fatal(err)
+	}
+	req.Header.Set("User-Agent", "https://github.com/rany2/go-textsynth")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		log.Fatalf("Service returned %d status code. Expected 200.", resp.StatusCode)
+	}
+
+	fmt.Printf("%s", j["prompt"].(string))
+	s := bufio.NewScanner(resp.Body)
+	var newPrompt = j["prompt"].(string)
+
+	finished := make(chan bool, 1)
+	sigchan := make(chan os.Signal, 1)
+	signal.Notify(sigchan, os.Interrupt)
+	go func() {
+		for s.Scan() {
+			var m map[string]interface{}
+			err := json.Unmarshal(s.Bytes(), &m)
+			if err == nil {
+				if keyExists(m, "text") {
+					if !dontNormalizeNewline && lineBreak == "\n" {
+						fmt.Printf("%s", string(normalizenewlines.Run([]byte(m["text"].(string)))))
+					} else if !dontNormalizeNewline && lineBreak == "\r\n" {
+						fmt.Printf("%s", string(windowsnewlines.Run([]byte(m["text"].(string)))))
+					} else {
+						fmt.Printf("%s", m["text"].(string))
+					}
+					newPrompt += m["text"].(string)
+				}
+			}
+		}
+		finished <- true
+	}()
+	go func() {
+		<-sigchan
+		cancel()
+	}()
+	<-finished
+	signal.Stop(sigchan) // stop listening on ctrl-c
+	close(sigchan)       // close channel to end goroutine
+	return newPrompt
+}
+
 func main() {
 	model := flag.String("model", "gptj_6B", "Select a model (gpt2_345M, gpt2_1558M, or gptj_6B)")
 	prompt := flag.String("prompt", "", "Prompt to send to Text Synth")
@@ -70,36 +156,17 @@ func main() {
 	dontNormalizeNewline := flag.Bool("dont-normalize-newline", false, "Do not convert Windows and Mac OS line endings to Unix")
 	flag.Parse()
 
-	allowedModels := map[string]bool{
-		"gpt2_345M":  true,
-		"gpt2_1558M": true,
-		"gptj_6B":    true,
-	}
-	if !allowedModels[*model] {
-		log.Fatal("model must be either gpt2_345M, gpt2_1558M, or gptj_6B.")
-	}
+	// Check if the model requested exists
+	validateModel(*model)
 
 	if *promptfile != "" && *prompt != "" {
 		log.Fatal("prompt and promptfile are mutually exclusive.")
 	} else if *promptfile != "" {
-		f, err := os.Open(*promptfile)
+		data, err := os.ReadFile(*promptfile)
 		if err != nil {
 			log.Fatal(err)
 		}
-		defer f.Close()
-		reader := bufio.NewReader(f)
-		part := make([]byte, PromptMaxSize)
-		for {
-			if count, err := reader.Read(part); err != nil {
-				if err == io.EOF {
-					break
-				} else {
-					log.Fatal(err)
-				}
-			} else {
-				*prompt += string(part[:count])
-			}
-		}
+		*prompt = string(data)
 	} else if *prompt == "" {
 		log.Fatal("prompt must be set via -prompt or -promptfile.")
 	}
@@ -120,6 +187,7 @@ func main() {
 		log.Fatal("invalid top_p value (0 < top-p <= 1).")
 	}
 
+	// No need to check if negative because flag.Uint deals with that
 	if *seed > SeedLimit {
 		log.Fatalf("seed cannot be greater than %d", SeedLimit)
 	}
@@ -133,73 +201,9 @@ func main() {
 
 outer:
 	for {
-		if len(*prompt) > PromptMaxSize {
-			log.Fatalf("The service doesn't accept prompt sizes greater than %d bytes. Current prompt size is %d bytes.", PromptMaxSize, len(*prompt))
-		}
-
-		if term.IsTerminal(syscall.Stdin) && term.IsTerminal(syscall.Stdout) {
-			screen.Clear()
-			screen.MoveTopLeft()
-		}
-
+		promptCheck(*prompt)
 		j["prompt"] = *prompt
-		request, err := json.Marshal(&j)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		ctx := context.Background()
-		ctx, cancel := context.WithCancel(ctx)
-		req, err := http.NewRequestWithContext(ctx, "POST", "https://bellard.org/textsynth/api/v1/engines/"+*model+"/completions", bytes.NewBuffer(request))
-		if err != nil {
-			log.Fatal(err)
-		}
-		req.Header.Set("User-Agent", "https://github.com/rany2/go-textsynth")
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			log.Fatalf("Service returned %d status code. Expected 200.", resp.StatusCode)
-		}
-
-		fmt.Printf("%s", *prompt)
-		s := bufio.NewScanner(resp.Body)
-		var newPrompt = *prompt
-
-		finished := make(chan bool, 1)
-		sigchan := make(chan os.Signal, 1)
-		signal.Notify(sigchan, os.Interrupt)
-		go func() {
-			for s.Scan() {
-				var m map[string]interface{}
-				err := json.Unmarshal(s.Bytes(), &m)
-				if err == nil {
-					if keyExists(m, "text") {
-						if !*dontNormalizeNewline && lineBreak == "\n" {
-							fmt.Printf("%s", string(normalizenewlines.Run([]byte(m["text"].(string)))))
-						} else if !*dontNormalizeNewline && lineBreak == "\r\n" {
-							fmt.Printf("%s", string(windowsnewlines.Run([]byte(m["text"].(string)))))
-						} else {
-							fmt.Printf("%s", m["text"].(string))
-						}
-						newPrompt += m["text"].(string)
-					}
-				}
-			}
-			finished <- true
-		}()
-		go func() {
-			<-sigchan
-			cancel()
-		}()
-		<-finished
-		signal.Stop(sigchan) // stop listening on ctrl-c
-		close(sigchan)       // close channel to end goroutine
-
+		var newPrompt = communicate(*model, j, *dontNormalizeNewline)
 		fmt.Printf("%s", lineBreak)
 		if term.IsTerminal(syscall.Stdin) && term.IsTerminal(syscall.Stdout) {
 			switch whatNow() {
