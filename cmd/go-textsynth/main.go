@@ -26,9 +26,6 @@ import (
 var tr = http.DefaultTransport.(*http.Transport).Clone()
 var client = &http.Client{Transport: tr}
 
-// PromptMaxSize sets the max prompt size limit to send to the API
-const PromptMaxSize = 4095
-
 // SeedLimit sets seed limit, anything over that limit causes the API to return an error
 const SeedLimit = 2147483647
 
@@ -70,13 +67,6 @@ func whatNow() string {
 		log.Fatal(err)
 	}
 	return response.WhatNow
-}
-
-// promptCheck checks if the service would accept the prompt or not
-func promptCheck(prompt string) {
-	if len(prompt) > PromptMaxSize {
-		log.Fatalf("The service doesn't accept prompt sizes greater than %d bytes. Current prompt size is %d bytes.", PromptMaxSize, len(prompt))
-	}
 }
 
 // communicate connects to the Text Synth server to send the prompt and show it to the user
@@ -202,7 +192,6 @@ func main() {
 
 outer:
 	for {
-		promptCheck(*prompt)
 		j["prompt"] = *prompt
 		var newPrompt = communicate(*model, j, *dontNormalizeNewline)
 		if term.IsTerminal(syscall.Stdin) && term.IsTerminal(syscall.Stdout) {
