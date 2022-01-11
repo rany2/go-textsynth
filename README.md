@@ -13,16 +13,22 @@ Text Synth client in Go.
 ```
 $ go-textsynth -h 
 Usage of go-textsynth:
+  -apikey string
+    	API key for Text Synth (default "842a11464f81fc8be43ac76fb36426d2")
   -dont-normalize-newline
     	Do not convert Windows and Mac OS line endings to Unix
+  -max-tokens uint
+    	Maximum number of tokens to generate. (default 200)
   -model string
-    	Select a model (gpt2_345M, gpt2_1558M, or gptj_6B) (default "gptj_6B")
+    	Select a model (boris_6B, fairseq_gpt_13B, and gptj_6B) (default "gptj_6B")
   -prompt string
     	Prompt to send to Text Synth
   -promptfile string
     	Like prompt but read from file
   -seed uint
     	Seed of the random number generator. Use 0 for a random seed.
+  -stop string
+    	Stop token to stop generation. Use "" to disable.
   -temperature float
     	Divide the logits (=log(probability) of the tokens) by the temperature value (0.1 <= temperature <= 10) (default 1)
   -top-k float
