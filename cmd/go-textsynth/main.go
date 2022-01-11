@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sort"
 	"syscall"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -29,21 +30,43 @@ var client = &http.Client{Transport: tr}
 // SeedLimit sets seed limit, anything over that limit causes the API to return an error
 const SeedLimit = 2147483647
 
+// Allowed models
+var allowedModels = map[string]bool{
+	"gptj_6B":         true,
+	"boris_6B":        true,
+	"fairseq_gpt_13B": true,
+}
+
 // keyExists is responsible for checking if server responded with json key
 func keyExists(decoded map[string]interface{}, key string) bool {
 	val, ok := decoded[key]
 	return ok && val != nil
 }
 
+// listModels lists all available models on Text Synth
+func listModels() (s string) {
+	keys := make([]string, 0, len(allowedModels))
+	for k := range allowedModels {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	max := len(keys)
+	for i, k := range keys {
+		if i == max-1 {
+			s += k
+		} else if i == max-2 {
+			s += k + ", and "
+		} else {
+			s += k + ", "
+		}
+	}
+	return
+}
+
 // validateModel checks if the model requested is available on Text Synth
 func validateModel(model string) {
-	allowedModels := map[string]bool{
-		"gpt2_345M":  true,
-		"gpt2_1558M": true,
-		"gptj_6B":    true,
-	}
 	if !allowedModels[model] {
-		log.Fatal("model must be either gpt2_345M, gpt2_1558M, or gptj_6B.")
+		log.Fatal("model must be either " + listModels())
 	}
 }
 
@@ -70,7 +93,7 @@ func whatNow() string {
 }
 
 // communicate connects to the Text Synth server to send the prompt and show it to the user
-func communicate(model string, j map[string]interface{}, dontNormalizeNewline bool) string {
+func communicate(model string, apikey string, j map[string]interface{}, dontNormalizeNewline bool) string {
 	if term.IsTerminal(syscall.Stdin) && term.IsTerminal(syscall.Stdout) {
 		screen.Clear()
 		screen.MoveTopLeft()
@@ -85,12 +108,13 @@ func communicate(model string, j map[string]interface{}, dontNormalizeNewline bo
 
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://bellard.org/textsynth/api/v1/engines/"+model+"/completions", bytes.NewBuffer(request))
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.textsynth.com/v1/engines/"+model+"/completions", bytes.NewBuffer(request))
 	if err != nil {
 		log.Fatal(err)
 	}
 	req.Header.Set("User-Agent", "https://github.com/rany2/go-textsynth")
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apikey)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -137,7 +161,7 @@ func communicate(model string, j map[string]interface{}, dontNormalizeNewline bo
 }
 
 func main() {
-	model := flag.String("model", "gptj_6B", "Select a model (gpt2_345M, gpt2_1558M, or gptj_6B)")
+	model := flag.String("model", "gptj_6B", "Select a model ("+listModels()+")")
 	prompt := flag.String("prompt", "", "Prompt to send to Text Synth")
 	promptfile := flag.String("promptfile", "", "Like prompt but read from file")
 	temperature := flag.Float64("temperature", 1.0, "Divide the logits (=log(probability) of the tokens) by the temperature value (0.1 <= temperature <= 10)")
@@ -145,6 +169,9 @@ func main() {
 	topP := flag.Float64("top-p", 0.9, "Keep the top tokens having cumulative probability >= top-p (0 < top-p <= 1)")
 	seed := flag.Uint("seed", 0, "Seed of the random number generator. Use 0 for a random seed.")
 	dontNormalizeNewline := flag.Bool("dont-normalize-newline", false, "Do not convert Windows and Mac OS line endings to Unix")
+	apikey := flag.String("apikey", "842a11464f81fc8be43ac76fb36426d2", "API key for Text Synth")
+	maxTokens := flag.Uint64("max-tokens", 200, "Maximum number of tokens to generate.")
+	stop := flag.String("stop", "", "Stop token to stop generation. Use \"\" to disable.")
 	flag.Parse()
 
 	// Check if the model requested exists
@@ -188,12 +215,19 @@ func main() {
 	j["top_k"] = *topK
 	j["top_p"] = *topP
 	j["seed"] = *seed
-	j["stream"] = true
+	j["max_tokens"] = *maxTokens
+	if *stop == "" {
+		j["stop"] = nil
+		j["stream"] = true
+	} else {
+		j["stop"] = *stop
+		j["stream"] = false
+	}
 
 outer:
 	for {
 		j["prompt"] = *prompt
-		var newPrompt = communicate(*model, j, *dontNormalizeNewline)
+		var newPrompt = communicate(*model, *apikey, j, *dontNormalizeNewline)
 		if term.IsTerminal(syscall.Stdin) && term.IsTerminal(syscall.Stdout) {
 			fmt.Printf("%s", lineBreak)
 			switch whatNow() {
